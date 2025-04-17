@@ -11,8 +11,14 @@ class SupabaseClient:
     """Client for interacting with Supabase API."""
     
     def __init__(self):
-        self.url = os.environ.get("SUPABASE_URL", "https://owzerqaududhfwngyqbp.supabase.co")
-        self.key = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93emVycWF1ZHVkaGZ3bmd5cWJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU0MjgzMjYsImV4cCI6MjA1MTAwNDMyNn0.FgkO0e2Ey77Og15q-pdL4r6Mlz6t9ExJZCm2eXcAhMo")
+        self.url = os.environ.get("SUPABASE_URL")
+        if not self.url:
+            raise ValueError("SUPABASE_URL environment variable is required")
+            
+        self.key = os.environ.get("SUPABASE_KEY")
+        if not self.key:
+            raise ValueError("SUPABASE_KEY environment variable is required")
+            
         self.headers = {
             "apikey": self.key,
             "Content-Type": "application/json"
@@ -24,7 +30,10 @@ class SupabaseClient:
         }
         
         # Set table prefixes for the application
-        self.session_id = "5sy83d"
+        self.session_id = os.environ.get("SESSION_ID")
+        if not self.session_id:
+            raise ValueError("SESSION_ID environment variable is required")
+            
         self.prefix = "ai_phone_assistant"
         
     def get_table_name(self, entity: str) -> str:

@@ -11,19 +11,19 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "AI Phone Assistant"
     
     # Supabase configuration
-    SUPABASE_URL: str = os.environ.get("SUPABASE_URL", "https://owzerqaududhfwngyqbp.supabase.co")
-    SUPABASE_KEY: str = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93emVycWF1ZHVkaGZ3bmd5cWJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU0MjgzMjYsImV4cCI6MjA1MTAwNDMyNn0.FgkO0e2Ey77Og15q-pdL4r6Mlz6t9ExJZCm2eXcAhMo")
-    SESSION_ID: str = "5sy83d"
+    SUPABASE_URL: str = os.environ.get("SUPABASE_URL", "")
+    SUPABASE_KEY: str = os.environ.get("SUPABASE_KEY", "")
+    SESSION_ID: str = os.environ.get("SESSION_ID", "")
     
     # OAuth and JWT
-    JWT_SECRET: str = os.environ.get("JWT_SECRET", "top_secret_jwt_key")
+    JWT_SECRET: str = os.environ.get("JWT_SECRET", "")  # Must be set in environment
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRATION_SECONDS: int = 3600
     
     # Postgres (for SQLAlchemy, if needed)
     POSTGRES_SERVER: str = os.environ.get("POSTGRES_SERVER", "localhost")
-    POSTGRES_USER: str = os.environ.get("POSTGRES_USER", "postgres") 
-    POSTGRES_PASSWORD: str = os.environ.get("POSTGRES_PASSWORD", "postgres")
+    POSTGRES_USER: str = os.environ.get("POSTGRES_USER", "") 
+    POSTGRES_PASSWORD: str = os.environ.get("POSTGRES_PASSWORD", "")
     POSTGRES_DB: str = os.environ.get("POSTGRES_DB", "ai_phone_assistant")
     SQLALCHEMY_DATABASE_URI: Optional[PostgresDsn] = None
     
@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     
     # ElevenLabs configuration
     ELEVENLABS_API_KEY: str = os.environ.get("ELEVENLABS_API_KEY", "")
-    ELEVENLABS_DEFAULT_VOICE: str = os.environ.get("ELEVENLABS_DEFAULT_VOICE", "21m00Tcm4TlvDq8ikWAM")
+    ELEVENLABS_DEFAULT_VOICE: str = os.environ.get("ELEVENLABS_DEFAULT_VOICE", "")
     
     # Google API configuration
     GOOGLE_CLIENT_ID: str = os.environ.get("GOOGLE_CLIENT_ID", "")
@@ -86,6 +86,12 @@ class Settings(BaseSettings):
     class Config:
         case_sensitive = True
         env_file = ".env"
+        
+        @classmethod
+        def parse_env_var(cls, field_name: str, raw_val: str) -> Any:
+            if field_name == "DEFAULT_BUSINESS_HOURS":
+                return json.loads(raw_val)
+            return raw_val
         
     def get_system_prompt(self, industry_type: str = "general") -> str:
         """Get a default system prompt for a specific industry."""
