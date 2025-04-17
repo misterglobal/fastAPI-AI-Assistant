@@ -46,7 +46,7 @@ async def oauth_callback(code: str, state: Optional[str] = None):
             
             # Get user email from token_info when we have it
             # For now, just use a placeholder
-            user_email = "user@example.com"  # This would come from Google API
+            user_email = ""  # This would come from Google API
             
             integration_data = {
                 "user_id": user_id,
