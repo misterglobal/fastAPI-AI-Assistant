@@ -33,7 +33,7 @@ pytest-cov==4.1.0
 # Utilities
 python-dotenv==1.0.0
 aiojobs==1.1.0  # For managing async background jobs
-logging-extend==1.0.1
+# logging-extend==1.0.1  # Commented out due to package not found
 cachetools==5.3.2
 
 # For backpressure and rate limiting

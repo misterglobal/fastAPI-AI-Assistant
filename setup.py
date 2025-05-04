@@ -1,0 +1,32 @@
+from setuptools import setup, find_packages
+
+setup(
+    name="ai-phone-assistant",
+    version="0.1.0",
+    packages=find_packages(),
+    install_requires=[
+        "fastapi==0.109.2",
+        "uvicorn[standard]==0.24.0",
+        "pydantic[email]==2.5.3",
+        "python-jose==3.3.0",
+        "passlib==1.7.4",
+        "python-multipart==0.0.6",
+        "httpx==0.26.0",
+        "sqlalchemy==2.0.26",
+        "asyncpg==0.28.0",
+        "tenacity==8.2.3",
+        "twilio==8.9.1",
+        "google-auth==2.29.0",
+        "google-auth-oauthlib==1.0.0",
+        "google-api-python-client==2.111.0",
+        "python-dateutil==2.8.2",
+        "openai==1.16.0",
+        "asyncio==3.4.3",
+        "python-dotenv==1.0.0",
+        "aiojobs==1.1.0",
+        "cachetools==5.3.2",
+        "ratelimit==2.2.1",
+        "email-validator==2.1.0"
+    ],
+    python_requires=">=3.8",
+) 

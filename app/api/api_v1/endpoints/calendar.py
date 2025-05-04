@@ -1,251 +1,114 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Body, Query
-from fastapi.responses import RedirectResponse
-from typing import Dict, Optional, List, Any
+from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import List, Dict, Any, Optional
 import logging
+from app.core.auth import get_current_user
+from app.schemas.calendar import CalendarEvent, CalendarEventCreate, CalendarEventUpdate
 import os
 
-from app.core.auth import get_current_user
-from app.services.calendar_service import CalendarService
-from app.repositories.google_integration_repository import GoogleIntegrationRepository
-
 router = APIRouter()
-calendar_service = CalendarService()
 logger = logging.getLogger(__name__)
 
-@router.post("/connect")
-async def connect_google_calendar(
+@router.get("/", response_model=List[CalendarEvent])
+async def get_calendar_events(
+    start_date: str = Query(None, description="Start date in ISO format"),
+    end_date: str = Query(None, description="End date in ISO format"),
     current_user: Dict = Depends(get_current_user)
 ):
     """
-    Start OAuth flow to connect Google Calendar.
+    Get calendar events for the current user.
     """
-    try:
-        user_id = current_user.get("sub")
-        
-        # Generate authorization URL
-        auth_url = calendar_service.get_auth_url(user_id)
-        
-        return {"auth_url": auth_url}
+    logger.info(f"Getting calendar events for user {current_user.get('id')} from {start_date} to {end_date}")
     
-    except Exception as e:
-        logger.error(f"Error starting OAuth flow: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to start OAuth flow")
-
-@router.get("/oauth_callback")
-async def oauth_callback(code: str, state: Optional[str] = None):
-    """
-    Handle OAuth callback from Google.
-    """
-    try:
-        # Process the authorization code
-        token_info = await calendar_service.process_auth_callback(code)
-        
-        # Store token information
-        if state:
-            user_id = state  # We stored user ID as state
-            
-            # Get user email from token_info when we have it
-            # For now, just use a placeholder
-            user_email = ""  # This would come from Google API
-            
-            integration_data = {
-                "user_id": user_id,
-                "email": user_email,
-                "access_token": token_info["access_token"],
-                "refresh_token": token_info["refresh_token"],
-                "scopes": ",".join(token_info["scopes"])
+    # In development mode, return mock data
+    if os.environ.get("ENVIRONMENT") != "production":
+        return [
+            {
+                "id": "mock-event-1",
+                "title": "Mock Calendar Event 1",
+                "description": "This is a mock calendar event for development",
+                "start_time": "2023-04-20T09:00:00Z",
+                "end_time": "2023-04-20T10:00:00Z",
+                "attendees": ["user@example.com"],
+                "location": "Virtual",
+                "user_id": current_user.get("id"),
+                "created_at": "2023-04-15T12:00:00Z",
+                "updated_at": "2023-04-15T12:00:00Z"
             }
-            
-            await GoogleIntegrationRepository.create(integration_data)
-        
-        # Redirect to frontend with success parameter
-        frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
-        return RedirectResponse(url=f"{frontend_url}/calendar?success=true")
+        ]
     
-    except Exception as e:
-        logger.error(f"Error processing OAuth callback: {str(e)}")
-        # Redirect to frontend with error parameter
-        frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
-        return RedirectResponse(url=f"{frontend_url}/calendar?error=true")
+    # In production, this would connect to Google Calendar API
+    raise HTTPException(status_code=501, detail="Calendar integration not implemented yet")
 
-@router.get("/calendars")
-async def list_calendars(current_user: Dict = Depends(get_current_user)):
-    """
-    List user's Google Calendars.
-    """
-    try:
-        user_id = current_user.get("sub")
-        
-        # Get user's Google integration
-        integration = await GoogleIntegrationRepository.get_by_user_id(user_id)
-        
-        if not integration:
-            raise HTTPException(status_code=404, detail="Google Calendar not connected")
-            
-        # Construct token info
-        token_info = {
-            "access_token": integration["access_token"],
-            "refresh_token": integration["refresh_token"],
-            "scopes": integration["scopes"].split(",")
-        }
-        
-        # Get calendars
-        calendars = await calendar_service.get_calendars(token_info)
-        
-        return {"calendars": calendars}
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error listing calendars: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to list calendars")
-
-@router.post("/available-slots")
-async def get_available_slots(
-    data: Dict[str, Any] = Body(...),
+@router.post("/", response_model=CalendarEvent)
+async def create_calendar_event(
+    event: CalendarEventCreate,
     current_user: Dict = Depends(get_current_user)
 ):
     """
-    Get available time slots for scheduling.
+    Create a new calendar event.
     """
-    try:
-        user_id = current_user.get("sub")
-        
-        calendar_id = data.get("calendar_id")
-        date_range = data.get("date_range")
-        business_hours = data.get("business_hours")
-        duration_minutes = data.get("duration_minutes", 30)
-        
-        if not all([calendar_id, date_range, business_hours]):
-            raise HTTPException(status_code=400, detail="Missing required parameters")
-            
-        # Get user's Google integration
-        integration = await GoogleIntegrationRepository.get_by_user_id(user_id)
-        
-        if not integration:
-            raise HTTPException(status_code=404, detail="Google Calendar not connected")
-            
-        # Construct token info
-        token_info = {
-            "access_token": integration["access_token"],
-            "refresh_token": integration["refresh_token"],
-            "scopes": integration["scopes"].split(",")
-        }
-        
-        # Get available slots
-        slots = await calendar_service.get_available_slots(
-            token_info=token_info,
-            calendar_id=calendar_id,
-            date_range=date_range,
-            business_hours=business_hours,
-            duration_minutes=duration_minutes
-        )
-        
-        # Format slots for frontend
-        formatted_slots = []
-        for slot in slots:
-            formatted_slots.append({
-                "start": slot["start"].isoformat(),
-                "end": slot["end"].isoformat()
-            })
-        
-        return {"slots": formatted_slots}
+    logger.info(f"Creating calendar event for user {current_user.get('id')}")
     
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting available slots: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to get available slots")
+    # In development mode, return mock data
+    if os.environ.get("ENVIRONMENT") != "production":
+        return {
+            "id": "mock-new-event",
+            "title": event.title,
+            "description": event.description,
+            "start_time": event.start_time,
+            "end_time": event.end_time,
+            "attendees": event.attendees,
+            "location": event.location,
+            "user_id": current_user.get("id"),
+            "created_at": "2023-04-15T12:00:00Z",
+            "updated_at": "2023-04-15T12:00:00Z"
+        }
+    
+    # In production, this would connect to Google Calendar API
+    raise HTTPException(status_code=501, detail="Calendar integration not implemented yet")
 
-@router.post("/schedule")
-async def schedule_appointment(
-    data: Dict[str, Any] = Body(...),
+@router.put("/{event_id}", response_model=CalendarEvent)
+async def update_calendar_event(
+    event_id: str,
+    event: CalendarEventUpdate,
     current_user: Dict = Depends(get_current_user)
 ):
     """
-    Schedule an appointment.
+    Update an existing calendar event.
     """
-    try:
-        user_id = current_user.get("sub")
-        
-        calendar_id = data.get("calendar_id")
-        appointment_info = data.get("appointment")
-        
-        if not all([calendar_id, appointment_info]):
-            raise HTTPException(status_code=400, detail="Missing required parameters")
-            
-        # Get user's Google integration
-        integration = await GoogleIntegrationRepository.get_by_user_id(user_id)
-        
-        if not integration:
-            raise HTTPException(status_code=404, detail="Google Calendar not connected")
-            
-        # Construct token info
-        token_info = {
-            "access_token": integration["access_token"],
-            "refresh_token": integration["refresh_token"],
-            "scopes": integration["scopes"].split(",")
-        }
-        
-        # Schedule appointment
-        event = await calendar_service.schedule_appointment(
-            token_info=token_info,
-            calendar_id=calendar_id,
-            appointment_info=appointment_info
-        )
-        
-        return {"event": event}
+    logger.info(f"Updating calendar event {event_id} for user {current_user.get('id')}")
     
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error scheduling appointment: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to schedule appointment")
+    # In development mode, return mock data
+    if os.environ.get("ENVIRONMENT") != "production":
+        return {
+            "id": event_id,
+            "title": event.title,
+            "description": event.description,
+            "start_time": event.start_time,
+            "end_time": event.end_time,
+            "attendees": event.attendees,
+            "location": event.location,
+            "user_id": current_user.get("id"),
+            "created_at": "2023-04-15T12:00:00Z",
+            "updated_at": "2023-04-15T13:00:00Z"
+        }
+    
+    # In production, this would connect to Google Calendar API
+    raise HTTPException(status_code=501, detail="Calendar integration not implemented yet")
 
-@router.post("/update-integration")
-async def update_integration(
-    data: Dict[str, Any] = Body(...),
+@router.delete("/{event_id}", response_model=Dict[str, bool])
+async def delete_calendar_event(
+    event_id: str,
     current_user: Dict = Depends(get_current_user)
 ):
     """
-    Update Google Calendar integration settings.
+    Delete a calendar event.
     """
-    try:
-        user_id = current_user.get("sub")
-        
-        calendar_id = data.get("calendar_id")
-        availability_days = data.get("availability_days")
-        availability_start = data.get("availability_start")
-        availability_end = data.get("availability_end")
-        
-        # Get user's Google integration
-        integration = await GoogleIntegrationRepository.get_by_user_id(user_id)
-        
-        if not integration:
-            raise HTTPException(status_code=404, detail="Google Calendar not connected")
-            
-        # Update integration settings
-        update_data = {}
-        
-        if calendar_id:
-            update_data["calendar_id"] = calendar_id
-            
-        if availability_days:
-            update_data["availability_days"] = availability_days
-            
-        if availability_start:
-            update_data["availability_start"] = availability_start
-            
-        if availability_end:
-            update_data["availability_end"] = availability_end
-            
-        if update_data:
-            await GoogleIntegrationRepository.update(integration["id"], update_data)
-        
-        return {"message": "Integration settings updated"}
+    logger.info(f"Deleting calendar event {event_id} for user {current_user.get('id')}")
     
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error updating integration: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to update integration settings")
+    # In development mode, return success
+    if os.environ.get("ENVIRONMENT") != "production":
+        return {"success": True}
+    
+    # In production, this would connect to Google Calendar API
+    raise HTTPException(status_code=501, detail="Calendar integration not implemented yet")
